@@ -25,10 +25,6 @@ type Handler struct {
 func (h *Handler) Handle(ctx context.Context, event sdk.Event) error {
 	logrus.Debug("handling object ", event.Object.GetObjectKind().GroupVersionKind().String())
 
-	if event.Deleted {
-		return nil
-	}
-
 	switch o := event.Object.(type) {
 	case *v1alpha1.ThreeScale:
 		logrus.Debugf("ThreeScale: %v, Phase: %v", o.Name, o.Status.Phase)

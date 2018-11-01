@@ -10,7 +10,7 @@ import (
 
 const (
 	version   = "v1alpha1"
-	groupName = "integreatly.org"
+	groupName = "3scale.net"
 )
 
 var (

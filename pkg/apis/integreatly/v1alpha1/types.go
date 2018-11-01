@@ -5,13 +5,11 @@ import (
 )
 
 const (
-	Group                 = "integreatly.org"
-	Version               = "v1alpha1"
-	ThreescaleKind        = "ThreeScale"
-	ThreescaleVersion     = "2.2.0.GA"
-	TEMPLATE_NAME         = "3scale-amp-2.2.0.GA.yml"
-	TEMPLATE_PATH         = "deploy/templates"
-	TEMPLATE_PATH_ENV_VAR = "TEMPLATE_DIR"
+	Group             = "3scale.net"
+	Version           = "v1alpha1"
+	ThreescaleKind    = "ThreeScale"
+	ThreescaleVersion = "2.2.0.GA"
+	TEMPLATE_NAME     = "3scale-amp-2.2.0.GA.yml"
 )
 
 type Config struct {
@@ -110,7 +108,8 @@ type T interface{}
 type StatusPhase string
 
 type ThreeScaleStatus struct {
-	Phase StatusPhase `json:"phase"`
+	Version string      `json:"version"`
+	Phase   StatusPhase `json:"phase"`
 	// marked as true when all work is done on it
 	Ready bool `json:"ready"`
 }

@@ -107,8 +107,7 @@ func (c *Client) create(obj T, resourcePath, resourceName string) error {
 
 	jsonValue, err := json.Marshal(obj)
 	if err != nil {
-		logrus.Errorf("error %+v marshalling object", err)
-		return nil
+		return err
 	}
 
 	req, err := http.NewRequest(
@@ -117,7 +116,6 @@ func (c *Client) create(obj T, resourcePath, resourceName string) error {
 		bytes.NewBuffer(jsonValue),
 	)
 	if err != nil {
-		logrus.Errorf("error creating POST %s request %+v", resourceName, err)
 		return errors.Wrapf(err, "error creating POST %s request", resourceName)
 	}
 
@@ -125,7 +123,6 @@ func (c *Client) create(obj T, resourcePath, resourceName string) error {
 	res, err := c.requester.Do(req)
 
 	if err != nil {
-		logrus.Errorf("error on request %+v", err)
 		return errors.Wrapf(err, "error performing POST %s request", resourceName)
 	}
 	defer res.Body.Close()
@@ -133,11 +130,6 @@ func (c *Client) create(obj T, resourcePath, resourceName string) error {
 	logrus.Debugf("response status: %v, %v", res.StatusCode, res.Status)
 	if res.StatusCode != 201 {
 		return fmt.Errorf("failed to create %s: (%d) %s", resourceName, res.StatusCode, res.Status)
-	}
-
-	if resourceName == "client" {
-		d, _ := ioutil.ReadAll(res.Body)
-		fmt.Println("user response ", string(d))
 	}
 
 	logrus.Debugf("response:", res)
@@ -153,13 +145,11 @@ func (c *Client) get(resourcePath, resourceName string, unMarshalFunc func(body 
 		nil,
 	)
 	if err != nil {
-		logrus.Errorf("error creating GET %s request %+v", resourceName, err)
 		return nil, errors.Wrapf(err, "error creating GET %s request", resourceName)
 	}
 
 	res, err := c.requester.Do(req)
 	if err != nil {
-		logrus.Errorf("error on request %+v", err)
 		return nil, errors.Wrapf(err, "error performing GET %s request", resourceName)
 	}
 
@@ -171,7 +161,6 @@ func (c *Client) get(resourcePath, resourceName string, unMarshalFunc func(body 
 
 	body, err := ioutil.ReadAll(res.Body)
 	if err != nil {
-		logrus.Errorf("error reading response %+v", err)
 		return nil, errors.Wrapf(err, "error reading %s GET response", resourceName)
 	}
 
@@ -179,7 +168,7 @@ func (c *Client) get(resourcePath, resourceName string, unMarshalFunc func(body 
 
 	obj, err := unMarshalFunc(body)
 	if err != nil {
-		logrus.Error(err)
+		return nil, err
 	}
 	logrus.Debugf("%s GET= %#v", resourceName, obj)
 
@@ -200,19 +189,16 @@ func (c *Client) update(obj T, resourcePath, resourceName string) error {
 		bytes.NewBuffer(jsonValue),
 	)
 	if err != nil {
-		logrus.Errorf("error creating UPDATE %s request %+v", resourceName, err)
 		return errors.Wrapf(err, "error creating UPDATE %s request", resourceName)
 	}
 
 	req.Header.Set("Content-Type", "application/json")
 	res, err := c.requester.Do(req)
 	if err != nil {
-		logrus.Errorf("error on request %+v", err)
 		return errors.Wrapf(err, "error performing UPDATE %s request", resourceName)
 	}
 	defer res.Body.Close()
 	if res.StatusCode < 200 || res.StatusCode > 299 {
-		logrus.Errorf("failed to UPDATE %s %v", resourceName, res.Status)
 		return fmt.Errorf("failed to UPDATE %s: (%d) %s", resourceName, res.StatusCode, res.Status)
 	}
 
@@ -229,13 +215,11 @@ func (c *Client) list(resourcePath, resourceName string, unMarshalListFunc func(
 		nil,
 	)
 	if err != nil {
-		logrus.Errorf("error creating LIST %s request %+v", resourceName, err)
 		return nil, errors.Wrapf(err, "error creating LIST %s request", resourceName)
 	}
 
 	res, err := c.requester.Do(req)
 	if err != nil {
-		logrus.Errorf("error on request %+v", err)
 		return nil, errors.Wrapf(err, "error performing LIST %s request", resourceName)
 	}
 	defer res.Body.Close()
@@ -247,7 +231,6 @@ func (c *Client) list(resourcePath, resourceName string, unMarshalListFunc func(
 
 	body, err := ioutil.ReadAll(res.Body)
 	if err != nil {
-		logrus.Errorf("error reading response %+v", err)
 		return nil, errors.Wrapf(err, "error reading %s LIST response", resourceName)
 	}
 
@@ -255,7 +238,7 @@ func (c *Client) list(resourcePath, resourceName string, unMarshalListFunc func(
 
 	objs, err := unMarshalListFunc(body)
 	if err != nil {
-		logrus.Error(err)
+		return nil, err
 	}
 	logrus.Debugf("%s LIST= %#v", resourceName, objs)
 

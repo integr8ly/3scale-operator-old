@@ -46,6 +46,7 @@ func (ph *phaseHandler) Initialise(obj *v1alpha1.ThreeScale) (*v1alpha1.ThreeSca
 		return nil, errors.Wrap(err, "validation failed")
 	}
 
+	tsState.Status.Version = v1alpha1.ThreescaleVersion
 	tsState.Status.Phase = v1alpha1.PhaseProvisionCredentials
 	return tsState, nil
 }
@@ -85,38 +86,47 @@ func (ph *phaseHandler) ReconcileThreeScale(obj *v1alpha1.ThreeScale) (*v1alpha1
 	if err != nil {
 		return nil, errors.Wrap(err, "error provisioning threescale")
 	}
+	logrus.Info("Create Resources: done")
 	ts, err = ph.CheckInstallResourcesReady(ts)
 	if err != nil {
-		return nil, errors.Wrap(err, "error checking pods ready")
+		return nil, errors.Wrap(err, "error checking resources ready")
 	}
 
-	if ts.Status.Ready {
-		tsClient, err := ph.tsFactory.AuthenticatedClient(*ts)
-		if err != nil {
-			return nil, errors.Wrap(err, "failed to get authenticated client for threescale")
-		}
-
-		ts, err = ph.ReconcileAuthProviders(ts, tsClient)
-		if err != nil {
-			return nil, errors.Wrap(err, "error reconciling auth providers")
-		}
-		ts, err = ph.ReconcileUsers(ts, tsClient)
-		if err != nil {
-			return nil, errors.Wrap(err, "error reconciling users")
-		}
+	if !ts.Status.Ready {
+		logrus.Info("Resources Ready: no")
+		return ts, nil
 	}
+	logrus.Info("Resources Ready: yes")
+
+	tsClient, err := ph.tsFactory.AuthenticatedClient(*ts)
+	if err != nil {
+		return nil, errors.Wrap(err, "failed to get authenticated client for threescale")
+	}
+
+	ts, err = ph.ReconcileAuthProviders(ts, tsClient)
+	if err != nil {
+		return nil, errors.Wrap(err, "error reconciling auth providers")
+	}
+	logrus.Info("Reconcile Authentication Providers: done")
+	ts, err = ph.ReconcileUsers(ts, tsClient)
+	if err != nil {
+		return nil, errors.Wrap(err, "error reconciling users")
+	}
+	logrus.Info("Reconcile Users: done")
 
 	return ts, nil
 }
 
 func (ph *phaseHandler) InstallThreeScale(ts *v1alpha1.ThreeScale) (*v1alpha1.ThreeScale, error) {
-	logrus.Info("InstallThreeScale")
 	//Set params
 	decodedParams := map[string]string{}
 	adminCreds, err := ph.k8sClient.CoreV1().Secrets(ts.Namespace).Get(ts.Spec.AdminCredentials, metav1.GetOptions{})
-	masterCreds, err := ph.k8sClient.CoreV1().Secrets(ts.Namespace).Get(ts.Spec.MasterCredentials, metav1.GetOptions{})
 	if err != nil {
 		return nil, errors.Wrap(err, "failed to get the secret for the admin credentials")
+	}
+	masterCreds, err := ph.k8sClient.CoreV1().Secrets(ts.Namespace).Get(ts.Spec.MasterCredentials, metav1.GetOptions{})
+	if err != nil {
+		return nil, errors.Wrap(err, "failed to get the secret for the master credentials")
 	}
 	for k, v := range adminCreds.Data {
 		decodedParams[k] = string(v)
@@ -155,6 +165,9 @@ func (ph *phaseHandler) InstallThreeScale(ts *v1alpha1.ThreeScale) (*v1alpha1.Th
 		}
 
 		unstructObj, err := k8sutil.UnstructuredFromRuntimeObject(o)
+		if err != nil {
+			return nil, errors.Wrap(err, "failed to get runtime object")
+		}
 		ownerRefs := unstructObj.GetOwnerReferences()
 		ownerRefs = append(ownerRefs, *NewOwnerRef(ts))
 		unstructObj.SetOwnerReferences(ownerRefs)
@@ -172,7 +185,6 @@ func (ph *phaseHandler) InstallThreeScale(ts *v1alpha1.ThreeScale) (*v1alpha1.Th
 }
 
 func (ph *phaseHandler) CheckInstallResourcesReady(ts *v1alpha1.ThreeScale) (*v1alpha1.ThreeScale, error) {
-	logrus.Info("CheckInstallResourcesReady")
 	podList, err := ph.k8sClient.CoreV1().Pods(ts.Namespace).List(metav1.ListOptions{
 		IncludeUninitialized: false,
 	})
@@ -191,6 +203,9 @@ func (ph *phaseHandler) CheckInstallResourcesReady(ts *v1alpha1.ThreeScale) (*v1
 	}
 
 	osClient, err := ph.osClient.RouteClient()
+	if err != nil {
+		return nil, errors.Wrap(err, "failed to get route client")
+	}
 
 	adminRoute, err := osClient.Routes(ts.Namespace).Get("system-provider-admin-route", metav1.GetOptions{})
 	if err != nil {
@@ -216,7 +231,6 @@ func (ph *phaseHandler) CheckInstallResourcesReady(ts *v1alpha1.ThreeScale) (*v1
 }
 
 func (ph *phaseHandler) ReconcileAuthProviders(ts *v1alpha1.ThreeScale, tsClient threescale.ThreeScaleInterface) (*v1alpha1.ThreeScale, error) {
-	logrus.Info("ReconcileAuthProviders")
 	apiAuthProviders, err := tsClient.ListAuthProviders()
 	if err != nil {
 		return nil, errors.Wrap(err, "error retrieving auth providers from threescale")
@@ -264,8 +278,6 @@ func reconcileAuthProvider(tsAuthProvider, specAuthProvider *v1alpha1.ThreeScale
 }
 
 func (ph *phaseHandler) ReconcileUsers(ts *v1alpha1.ThreeScale, tsClient threescale.ThreeScaleInterface) (*v1alpha1.ThreeScale, error) {
-	logrus.Info("ReconcileUsers")
-
 	apiUsers, err := tsClient.ListUsers()
 	if err != nil {
 		return nil, errors.Wrap(err, "error retrieving apiUsers from threescale")
@@ -318,39 +330,33 @@ func (ph *phaseHandler) ReconcileUsers(ts *v1alpha1.ThreeScale, tsClient threesc
 func reconcileUser(tsUser, specUser *v1alpha1.ThreeScaleUser, tsClient threescale.ThreeScaleInterface) error {
 	if tsUser == nil {
 		logrus.Infof("create user: %s", specUser.UserName)
-		err := tsClient.CreateUser(specUser)
+		return tsClient.CreateUser(specUser)
+	}
+	tsUser.Password = specUser.Password
+	if !reflect.DeepEqual(tsUser, specUser) {
+		logrus.Infof("update user: %s", specUser.UserName)
+		specUser.ID = tsUser.ID
+		err := tsClient.UpdateUser(specUser.ID, specUser)
 		if err != nil {
 			return err
 		}
-	} else {
-		tsUser.Password = specUser.Password
-		if !reflect.DeepEqual(tsUser, specUser) {
-			logrus.Infof("update user: %s", specUser.UserName)
-			specUser.ID = tsUser.ID
-			err := tsClient.UpdateUser(specUser.ID, specUser)
+		if specUser.Role != "" && specUser.Role != tsUser.Role {
+			logrus.Infof("update user role: %s, %s", specUser.UserName, specUser.Role)
+			err = tsClient.UpdateUserRole(specUser.ID, specUser.Role)
 			if err != nil {
 				return err
 			}
-			if specUser.Role != "" && specUser.Role != tsUser.Role {
-				logrus.Infof("update user role: %s, %s", specUser.UserName, specUser.Role)
-				err = tsClient.UpdateUserRole(specUser.ID, specUser.Role)
-				if err != nil {
-					return err
-				}
-			} else {
-				specUser.Role = tsUser.Role
-			}
-			specUser.State = tsUser.State
+		} else {
+			specUser.Role = tsUser.Role
 		}
-
-		if specUser.State == "pending" {
-			logrus.Infof("activate user: %s", specUser.UserName)
-			err := tsClient.ActivateUser(specUser.ID)
-			if err != nil {
-				return err
-			}
-		}
+		specUser.State = tsUser.State
 	}
+
+	if specUser.State == "pending" {
+		logrus.Infof("activate user: %s", specUser.UserName)
+		return tsClient.ActivateUser(specUser.ID)
+	}
+
 	return nil
 }
 

@@ -2,7 +2,7 @@ ORG=integreatly
 NAMESPACE=3scale
 PROJECT=3scale-operator
 SHELL = /bin/bash
-TAG = 0.0.1
+TAG = 0.0.2
 PKG = github.com/integr8ly/3scale-operator
 TEST_DIRS     ?= $(shell sh -c "find $(TOP_SRC_DIRS) -name \\*_test.go -exec dirname {} \\; | sort | uniq")
 
@@ -14,6 +14,9 @@ check-gofmt:
 test-unit:
 	@echo Running tests:
 	go test -v -race -cover ./pkg/...
+
+.PHONY: test
+test: check-gofmt test-unit
 
 .PHONY: setup
 setup:
@@ -79,7 +82,7 @@ install-crds:
 uninstall:
 	-kubectl delete role 3scale-operator -n $(NAMESPACE)
 	-kubectl delete rolebinding default-account-3scale-operator -n $(NAMESPACE)
-	-kubectl delete crd threescales.integreatly.org
+	-kubectl delete crd threescales.3scale.net
 	-kubectl delete namespace $(NAMESPACE)
 
 .PHONY: create-examples
@@ -89,3 +92,7 @@ create-examples:
 .PHONY: delete-examples
 delete-examples:
 	-kubectl delete threescales example
+
+.PHONY: deploy
+deploy:
+	-kubectl create --insecure-skip-tls-verify -f deploy/operator.yaml -n $(NAMESPACE)

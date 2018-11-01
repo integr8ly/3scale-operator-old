@@ -1,4 +1,4 @@
-apiVersion: "integreatly.org/v1alpha1"
+apiVersion: "3scale.net/v1alpha1"
 kind: "ThreeScale"
 metadata:
   name: "example"
@@ -37,6 +37,6 @@ spec:
     name: rhsso
     client_id: 3scale
     client_secret: 04dac6c3-b25b-4c52-990d-ff7290d6a74d
-    site: https://secure-sso-sso.apps.mnairn.openshiftworkshop.com/auth/realms/openshift
+    site: https://secure-sso-sso.apps.mnairn-65f8.openshiftworkshop.com/auth/realms/openshift
     skip_ssl_certificate_verification: true
     published: true

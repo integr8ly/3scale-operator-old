@@ -1,3 +1,3 @@
 // +k8s:deepcopy-gen=package
-// +groupName=integreatly.org
+// +groupName=3scale.net
 package v1alpha1
