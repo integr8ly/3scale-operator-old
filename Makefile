@@ -2,7 +2,7 @@ ORG=integreatly
 NAMESPACE=3scale
 PROJECT=3scale-operator
 SHELL = /bin/bash
-TAG = 0.0.2
+TAG = 0.0.3
 PKG = github.com/integr8ly/3scale-operator
 TEST_DIRS     ?= $(shell sh -c "find $(TOP_SRC_DIRS) -name \\*_test.go -exec dirname {} \\; | sort | uniq")
 
