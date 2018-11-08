@@ -2,7 +2,7 @@ ORG=integreatly
 NAMESPACE=3scale
 PROJECT=3scale-operator
 SHELL = /bin/bash
-TAG = 0.0.2
+TAG = 0.0.3
 PKG = github.com/integr8ly/3scale-operator
 TEST_DIRS     ?= $(shell sh -c "find $(TOP_SRC_DIRS) -name \\*_test.go -exec dirname {} \\; | sort | uniq")
 
@@ -14,6 +14,11 @@ check-gofmt:
 test-unit:
 	@echo Running tests:
 	go test -v -race -cover ./pkg/...
+
+.PHONY: test-e2e-local
+test-e2e-local:
+	@echo Running e2e tests:
+	-operator-sdk test local ./test/e2e --go-test-flags "-v"
 
 .PHONY: test
 test: check-gofmt test-unit
