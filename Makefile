@@ -2,7 +2,7 @@ ORG=integreatly
 NAMESPACE=3scale
 PROJECT=3scale-operator
 SHELL = /bin/bash
-TAG = 0.0.3
+TAG = 0.0.4
 PKG = github.com/integr8ly/3scale-operator
 TEST_DIRS     ?= $(shell sh -c "find $(TOP_SRC_DIRS) -name \\*_test.go -exec dirname {} \\; | sort | uniq")
 
@@ -56,7 +56,7 @@ generate:
 
 .PHONY: compile
 compile:
-	go build -o=3scale-operator ./cmd/3scale-operator
+	go build -o=3scale-operator ./cmd/manager
 
 .PHONY: packr
 packr:
@@ -77,26 +77,27 @@ check: check-gofmt test-unit
 install: install-crds
 	-oc new-project $(NAMESPACE)
 	-oc delete limits $(NAMESPACE)-core-resource-limits
-	-kubectl create --insecure-skip-tls-verify -f deploy/rbac.yaml -n $(NAMESPACE)
+	-kubectl create --insecure-skip-tls-verify -f deploy/role.yaml -n $(NAMESPACE)
+	-kubectl create --insecure-skip-tls-verify -f deploy/role_binding.yaml -n $(NAMESPACE)
 
 .PHONY: install-crds
 install-crds:
-	-kubectl create -f deploy/crd.yaml
+	-kubectl create -f deploy/crds/threescale_v1alpha1_threescale_crd.yaml
 
 .PHONY: uninstall
 uninstall:
 	-kubectl delete role 3scale-operator -n $(NAMESPACE)
-	-kubectl delete rolebinding default-account-3scale-operator -n $(NAMESPACE)
-	-kubectl delete crd threescales.3scale.net
+	-kubectl delete rolebinding 3scale-operator -n $(NAMESPACE)
+	-kubectl delete crd threescales.threescale.net
 	-kubectl delete namespace $(NAMESPACE)
 
 .PHONY: create-examples
 create-examples:
-	-kubectl create -f deploy/cr.yaml -n $(NAMESPACE)
+	-kubectl create -f deploy/crds/threescale_v1alpha1_threescale_cr.yaml -n $(NAMESPACE)
 
 .PHONY: delete-examples
 delete-examples:
-	-kubectl delete threescales example
+	-kubectl delete threescales example-threescale
 
 .PHONY: deploy
 deploy:
