@@ -84,6 +84,7 @@ install: install-crds
 .PHONY: install-crds
 install-crds:
 	-kubectl create -f deploy/crds/threescale_v1alpha1_threescale_crd.yaml
+	-kubectl create -f deploy/crds/threescale_v1alpha1_threescaletenant_crd.yaml
 
 .PHONY: uninstall
 uninstall:
