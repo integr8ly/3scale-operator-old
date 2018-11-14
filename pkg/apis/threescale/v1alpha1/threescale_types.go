@@ -1,6 +1,7 @@
 package v1alpha1
 
 import (
+	"fmt"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
@@ -138,5 +139,6 @@ func (ts *ThreeScale) Validate() error {
 }
 
 func init() {
+	fmt.Println("init threescale types")
 	SchemeBuilder.Register(&ThreeScale{}, &ThreeScaleList{})
 }

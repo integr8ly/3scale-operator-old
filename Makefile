@@ -77,6 +77,7 @@ check: check-gofmt test-unit
 install: install-crds
 	-oc new-project $(NAMESPACE)
 	-oc delete limits $(NAMESPACE)-core-resource-limits
+	-kubectl create --insecure-skip-tls-verify -f deploy/service_account.yaml -n $(NAMESPACE)
 	-kubectl create --insecure-skip-tls-verify -f deploy/role.yaml -n $(NAMESPACE)
 	-kubectl create --insecure-skip-tls-verify -f deploy/role_binding.yaml -n $(NAMESPACE)
 
@@ -88,6 +89,7 @@ install-crds:
 uninstall:
 	-kubectl delete role 3scale-operator -n $(NAMESPACE)
 	-kubectl delete rolebinding 3scale-operator -n $(NAMESPACE)
+	-kubectl delete serviceaccount 3scale-operator -n $(NAMESPACE)
 	-kubectl delete crd threescales.threescale.net
 	-kubectl delete namespace $(NAMESPACE)
 
