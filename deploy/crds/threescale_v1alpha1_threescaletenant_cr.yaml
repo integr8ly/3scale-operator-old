@@ -1,0 +1,7 @@
+apiVersion: threescale.net/v1alpha1
+kind: ThreeScaleTenant
+metadata:
+  name: example-threescaletenant
+spec:
+  # Add fields here
+  size: 3

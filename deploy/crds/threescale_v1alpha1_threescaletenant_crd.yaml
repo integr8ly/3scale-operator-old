@@ -1,0 +1,13 @@
+apiVersion: apiextensions.k8s.io/v1beta1
+kind: CustomResourceDefinition
+metadata:
+  name: threescaletenants.threescale.net
+spec:
+  group: threescale.net
+  names:
+    kind: ThreeScaleTenant
+    listKind: ThreeScaleTenantList
+    plural: threescaletenants
+    singular: threescaletenant
+  scope: Namespaced
+  version: v1alpha1
