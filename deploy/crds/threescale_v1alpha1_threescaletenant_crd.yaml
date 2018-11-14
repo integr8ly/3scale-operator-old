@@ -11,3 +11,65 @@ spec:
     singular: threescaletenant
   scope: Namespaced
   version: v1alpha1
+  validation:
+    openAPIV3Schema:
+      properties:
+        spec:
+          properties:
+            name:
+              type: string
+            adminUsername:
+              type: string
+            adminEmail:
+              type: string
+            adminCredentials:
+              type: string
+            users:
+              type: array
+              items:
+                type: object
+                properties:
+                  id:
+                    type: integer
+                  username:
+                    type: string
+                  password:
+                    type: string
+                  email:
+                    type: string
+                  role:
+                    type: string
+                  state:
+                    type: string
+            seedUsers:
+              type: object
+              properties:
+                count:
+                  type: integer
+                nameFormat:
+                  type: string
+                emailFormat:
+                  type: string
+                password:
+                  type: string
+                role:
+                  type: string
+            authProviders:
+              type: array
+              items:
+                type: object
+                properties:
+                  kind:
+                    type: string
+                  name:
+                    type: string
+                  client_id:
+                    type: string
+                  client_secret:
+                    type: string
+                  site:
+                    type: string
+                  skip_ssl_certificate_verification:
+                    type: boolean
+                  published:
+                    type: boolean

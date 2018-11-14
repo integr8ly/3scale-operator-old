@@ -270,7 +270,7 @@ type ThreeScaleFactory struct {
 }
 
 // AuthenticatedClient returns an authenticated client for requesting endpoints from the ThreeScale api
-func (tsf *ThreeScaleFactory) AuthenticatedClient(ts threescalev1alpha1.ThreeScale) (ThreeScaleInterface, error) {
+func (tsf *ThreeScaleFactory) AuthenticatedClient(ts threescalev1alpha1.ThreeScaleTenant) (ThreeScaleInterface, error) {
 	adminCreds := &v1.Secret{}
 	err := tsf.Client.Get(context.TODO(), types.NamespacedName{Name: ts.Spec.AdminCredentials, Namespace: ts.Namespace}, adminCreds)
 	if err != nil {

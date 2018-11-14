@@ -6,20 +6,20 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
-func TestThreeScale_Defaults(t *testing.T) {
+func TestThreeScaleTenant_Defaults(t *testing.T) {
 	tests := []struct {
 		name     string
-		ts       ThreeScale
-		validate func(t *testing.T, ts *ThreeScale)
+		ts       ThreeScaleTenant
+		validate func(t *testing.T, ts *ThreeScaleTenant)
 	}{
 		{
 			name: "test empty seed user config",
-			ts: ThreeScale{
-				Spec: ThreeScaleSpec{
+			ts: ThreeScaleTenant{
+				Spec: ThreeScaleTenantSpec{
 					SeedUsers: SeedUsersConfig{},
 				},
 			},
-			validate: func(t *testing.T, ts *ThreeScale) {
+			validate: func(t *testing.T, ts *ThreeScaleTenant) {
 				if ts.Spec.SeedUsers.Count != 0 {
 					t.Fatal("failed default seed users count should be 0")
 				}
@@ -39,8 +39,8 @@ func TestThreeScale_Defaults(t *testing.T) {
 		},
 		{
 			name: "test seed users config",
-			ts: ThreeScale{
-				Spec: ThreeScaleSpec{
+			ts: ThreeScaleTenant{
+				Spec: ThreeScaleTenantSpec{
 					SeedUsers: SeedUsersConfig{
 						Count:       1,
 						Role:        "member",
@@ -50,7 +50,7 @@ func TestThreeScale_Defaults(t *testing.T) {
 					},
 				},
 			},
-			validate: func(t *testing.T, ts *ThreeScale) {
+			validate: func(t *testing.T, ts *ThreeScaleTenant) {
 				if ts.Spec.SeedUsers.Count != 1 {
 					t.Fatal("failed seed users count should be 1")
 				}
@@ -81,12 +81,12 @@ func TestThreeScale_Defaults(t *testing.T) {
 	}
 }
 
-func TestThreeScale_Validate(t *testing.T) {
+func TestThreeScaleTenant_Validate(t *testing.T) {
 	type fields struct {
 		TypeMeta   metav1.TypeMeta
 		ObjectMeta metav1.ObjectMeta
-		Spec       ThreeScaleSpec
-		Status     ThreeScaleStatus
+		Spec       ThreeScaleTenantSpec
+		Status     ThreeScaleTenantStatus
 	}
 	tests := []struct {
 		name    string
@@ -97,14 +97,14 @@ func TestThreeScale_Validate(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			ts := &ThreeScale{
+			ts := &ThreeScaleTenant{
 				TypeMeta:   tt.fields.TypeMeta,
 				ObjectMeta: tt.fields.ObjectMeta,
 				Spec:       tt.fields.Spec,
 				Status:     tt.fields.Status,
 			}
 			if err := ts.Validate(); (err != nil) != tt.wantErr {
-				t.Errorf("ThreeScale.Validate() error = %v, wantErr %v", err, tt.wantErr)
+				t.Errorf("ThreeScaleTenant.Validate() error = %v, wantErr %v", err, tt.wantErr)
 			}
 		})
 	}

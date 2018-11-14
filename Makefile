@@ -92,15 +92,21 @@ uninstall:
 	-kubectl delete rolebinding 3scale-operator -n $(NAMESPACE)
 	-kubectl delete serviceaccount 3scale-operator -n $(NAMESPACE)
 	-kubectl delete crd threescales.threescale.net
+	-kubectl delete crd threescaletenants.threescale.net
 	-kubectl delete namespace $(NAMESPACE)
 
 .PHONY: create-examples
 create-examples:
 	-kubectl create -f deploy/crds/threescale_v1alpha1_threescale_cr.yaml -n $(NAMESPACE)
 
+.PHONY: create-examples
+create-example-tenant:
+	-kubectl create -f deploy/crds/threescale_v1alpha1_threescaletenant_cr.yaml -n $(NAMESPACE)
+
 .PHONY: delete-examples
 delete-examples:
 	-kubectl delete threescales example-threescale
+	-kubectl delete threescales example-threescaletenant
 
 .PHONY: deploy
 deploy:
