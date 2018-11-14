@@ -2,9 +2,9 @@ package e2e
 
 import (
 	goctx "context"
-	"github.com/integr8ly/3scale-operator/pkg/apis/integreatly/v1alpha1"
-	apis "github.com/integr8ly/3scale-operator/pkg/apis/integreatly/v1alpha1"
-	"github.com/integr8ly/3scale-operator/pkg/clients/openshift"
+	"github.com/integr8ly/3scale-operator/pkg/apis"
+	"github.com/integr8ly/3scale-operator/pkg/apis/threescale/v1alpha1"
+	routev1 "github.com/openshift/client-go/route/clientset/versioned/typed/route/v1"
 	framework "github.com/operator-framework/operator-sdk/pkg/test"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"testing"
@@ -58,7 +58,7 @@ func registerScheme(t *testing.T) {
 	threescaleList := &v1alpha1.ThreeScaleList{
 		TypeMeta: metav1.TypeMeta{
 			Kind:       "ThreeScale",
-			APIVersion: "3scale.net/v1alpha1",
+			APIVersion: "threescale.net/v1alpha1",
 		},
 	}
 	err := framework.AddToFrameworkScheme(apis.AddToScheme, threescaleList)
@@ -129,7 +129,7 @@ func verifySecrets(t *testing.T, f *framework.Framework, namespace string, secre
 }
 
 func verifyRoutes(t *testing.T, f *framework.Framework, namespace string, routes []string) error {
-	osClient, err := openshift.NewClientFactory(f.KubeConfig).RouteClient()
+	osClient, err := routev1.NewForConfig(f.KubeConfig)
 	if err != nil {
 		return err
 	}
@@ -157,7 +157,7 @@ func exampleThreeScale(ns string) *v1alpha1.ThreeScale {
 	return &v1alpha1.ThreeScale{
 		TypeMeta: metav1.TypeMeta{
 			Kind:       "ThreeScale",
-			APIVersion: "3scale.net/v1alpha1",
+			APIVersion: "threescale.net/v1alpha1",
 		},
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      "3scale-test",

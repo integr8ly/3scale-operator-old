@@ -2,16 +2,18 @@ package threescale
 
 import (
 	"bytes"
+	"context"
 	"crypto/tls"
 	"encoding/json"
 	"fmt"
-	"github.com/integr8ly/3scale-operator/pkg/apis/integreatly/v1alpha1"
+	threescalev1alpha1 "github.com/integr8ly/3scale-operator/pkg/apis/threescale/v1alpha1"
 	"github.com/pkg/errors"
 	"github.com/sirupsen/logrus"
 	"io/ioutil"
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/client-go/kubernetes/typed/core/v1"
+	"k8s.io/api/core/v1"
+	"k8s.io/apimachinery/pkg/types"
 	"net/http"
+	"sigs.k8s.io/controller-runtime/pkg/client"
 	"time"
 )
 
@@ -37,25 +39,25 @@ type Client struct {
 // T is a generic type for spec resources
 type T interface{}
 
-func (c *Client) CreateUser(user *v1alpha1.ThreeScaleUser) error {
+func (c *Client) CreateUser(user *threescalev1alpha1.ThreeScaleUser) error {
 	resourcePath := "admin/api/users.json"
 	return c.create(user, resourcePath, "users")
 }
 
-func (c *Client) GetUser(id int) (*v1alpha1.ThreeScaleApiUser, error) {
+func (c *Client) GetUser(id int) (*threescalev1alpha1.ThreeScaleApiUser, error) {
 	resourcePath := fmt.Sprintf("admin/api/users/%v.json", id)
 	result, err := c.get(resourcePath, "users", func(body []byte) (T, error) {
-		var user *v1alpha1.ThreeScaleApiUser
+		var user *threescalev1alpha1.ThreeScaleApiUser
 		err := json.Unmarshal(body, &user)
 		return user, err
 	})
 	if err != nil {
 		return nil, err
 	}
-	return result.(*v1alpha1.ThreeScaleApiUser), err
+	return result.(*threescalev1alpha1.ThreeScaleApiUser), err
 }
 
-func (c *Client) UpdateUser(id int, user *v1alpha1.ThreeScaleUser) error {
+func (c *Client) UpdateUser(id int, user *threescalev1alpha1.ThreeScaleUser) error {
 	resourcePath := fmt.Sprintf("admin/api/users/%v.json", id)
 	return c.update(user, resourcePath, "users")
 }
@@ -70,35 +72,35 @@ func (c *Client) ActivateUser(id int) error {
 	return c.update(nil, resourcePath, "users")
 }
 
-func (c *Client) ListUsers() ([]*v1alpha1.ThreeScaleApiUser, error) {
+func (c *Client) ListUsers() ([]*threescalev1alpha1.ThreeScaleApiUser, error) {
 	resourcePath := "admin/api/users.json"
 	result, err := c.list(resourcePath, "users", func(body []byte) (T, error) {
-		var users *v1alpha1.ThreeScaleUserList
+		var users *threescalev1alpha1.ThreeScaleUserList
 		err := json.Unmarshal(body, &users)
 		return users.Items, err
 	})
 	if err != nil {
 		return nil, err
 	}
-	return result.([]*v1alpha1.ThreeScaleApiUser), err
+	return result.([]*threescalev1alpha1.ThreeScaleApiUser), err
 }
 
-func (c *Client) CreateAuthProvider(user *v1alpha1.ThreeScaleAuthProvider) error {
+func (c *Client) CreateAuthProvider(user *threescalev1alpha1.ThreeScaleAuthProvider) error {
 	resourcePath := "admin/api/account/authentication_providers.json"
 	return c.create(user, resourcePath, "authentication_providers")
 }
 
-func (c *Client) ListAuthProviders() ([]*v1alpha1.ThreeScaleApiAuthProvider, error) {
+func (c *Client) ListAuthProviders() ([]*threescalev1alpha1.ThreeScaleApiAuthProvider, error) {
 	resourcePath := "admin/api/account/authentication_providers.json"
 	result, err := c.list(resourcePath, "authentication_providers", func(body []byte) (T, error) {
-		var provider *v1alpha1.ThreeScaleAuthProviderList
+		var provider *threescalev1alpha1.ThreeScaleAuthProviderList
 		err := json.Unmarshal(body, &provider)
 		return provider.Items, err
 	})
 	if err != nil {
 		return nil, err
 	}
-	return result.([]*v1alpha1.ThreeScaleApiAuthProvider), err
+	return result.([]*threescalev1alpha1.ThreeScaleApiAuthProvider), err
 }
 
 // Generic create function for creating new ThreeScale resources
@@ -246,30 +248,31 @@ func (c *Client) list(resourcePath, resourceName string, unMarshalListFunc func(
 }
 
 type ThreeScaleInterface interface {
-	CreateUser(user *v1alpha1.ThreeScaleUser) error
-	GetUser(id int) (*v1alpha1.ThreeScaleApiUser, error)
-	UpdateUser(id int, user *v1alpha1.ThreeScaleUser) error
+	CreateUser(user *threescalev1alpha1.ThreeScaleUser) error
+	GetUser(id int) (*threescalev1alpha1.ThreeScaleApiUser, error)
+	UpdateUser(id int, user *threescalev1alpha1.ThreeScaleUser) error
 	UpdateUserRole(id int, role string) error
 	ActivateUser(id int) error
-	ListUsers() ([]*v1alpha1.ThreeScaleApiUser, error)
+	ListUsers() ([]*threescalev1alpha1.ThreeScaleApiUser, error)
 
-	CreateAuthProvider(authProvider *v1alpha1.ThreeScaleAuthProvider) error
-	//GetAuthProvider(id int) (*v1alpha1.ThreeScaleAuthProvider, error)
-	//UpdateAuthProvider(id int, authProvider *v1alpha1.ThreeScaleAuthProvider) error
-	ListAuthProviders() ([]*v1alpha1.ThreeScaleApiAuthProvider, error)
+	CreateAuthProvider(authProvider *threescalev1alpha1.ThreeScaleAuthProvider) error
+	//GetAuthProvider(id int) (*threescalev1alpha1.ThreeScaleAuthProvider, error)
+	//UpdateAuthProvider(id int, authProvider *threescalev1alpha1.ThreeScaleAuthProvider) error
+	ListAuthProviders() ([]*threescalev1alpha1.ThreeScaleApiAuthProvider, error)
 }
 
 type ThreeScaleClientFactory interface {
-	AuthenticatedClient(kc v1alpha1.ThreeScale) (ThreeScaleInterface, error)
+	AuthenticatedClient(kc threescalev1alpha1.ThreeScale) (ThreeScaleInterface, error)
 }
 
 type ThreeScaleFactory struct {
-	SecretClient v1.SecretInterface
+	Client client.Client
 }
 
 // AuthenticatedClient returns an authenticated client for requesting endpoints from the ThreeScale api
-func (tsf *ThreeScaleFactory) AuthenticatedClient(kc v1alpha1.ThreeScale) (ThreeScaleInterface, error) {
-	adminCreds, err := tsf.SecretClient.Get(kc.Spec.AdminCredentials, metav1.GetOptions{})
+func (tsf *ThreeScaleFactory) AuthenticatedClient(ts threescalev1alpha1.ThreeScale) (ThreeScaleInterface, error) {
+	adminCreds := &v1.Secret{}
+	err := tsf.Client.Get(context.TODO(), types.NamespacedName{Name: ts.Spec.AdminCredentials, Namespace: ts.Namespace}, adminCreds)
 	if err != nil {
 		return nil, errors.Wrap(err, "failed to get the admin credentials")
 	}

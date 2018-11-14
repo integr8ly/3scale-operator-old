@@ -1,0 +1,42 @@
+apiVersion: threescale.net/v1alpha1
+kind: ThreeScale
+metadata:
+  name: example-threescale
+spec:
+  #The route suffix
+  routeSuffix: apps.mnairn-6f3c.openshiftworkshop.com
+  #Storage class for RWX system PVC
+  rwxStorageClass: ""
+  wildcardPolicy: Subdomain
+  mysqlPvcSize: 100Gi
+  #Admin Username
+  adminUsername: admin@example.com
+  #Admin Email
+  adminEmail: admin@example.com
+  #Seed Users
+  seedUsers:
+    count: 2
+  #Users
+  users:
+  - username: admin@example.com
+    email: admin@example.com
+  - username: admin1
+    email: admin1@example.com
+    password: Password1
+    role: admin
+  - username: member1
+    email: member1@example.com
+    password: Password1
+  - username: member2
+    email: member2@example.com
+    password: Password1
+    role: member
+  #Authentication Providers
+  authProviders:
+  - kind: keycloak
+    name: rhsso
+    client_id: 3scale
+    client_secret: 04dac6c3-b25b-4c52-990d-ff7290d6a74d
+    site: https://secure-sso-sso.apps.mnairn-6f3c.openshiftworkshop.com/auth/realms/openshift
+    skip_ssl_certificate_verification: true
+    published: true
