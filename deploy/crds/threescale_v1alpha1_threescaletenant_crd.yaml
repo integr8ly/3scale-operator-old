@@ -16,11 +16,26 @@ spec:
       properties:
         spec:
           properties:
+            tenant:
+              type: object
+              properties:
+                id:
+                  type: integer
+                domain:
+                  type: string
+                admin_domain:
+                  type: string
+                state:
+                  type: string
             name:
+              type: string
+            threeScaleName:
               type: string
             adminUsername:
               type: string
             adminEmail:
+              type: string
+            adminPassword:
               type: string
             adminCredentials:
               type: string

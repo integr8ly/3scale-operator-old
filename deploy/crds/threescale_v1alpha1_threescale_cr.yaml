@@ -3,8 +3,9 @@ kind: ThreeScale
 metadata:
   name: example-threescale
 spec:
+  tenantName: 3scale
   #The route suffix
-  routeSuffix: apps.mnairn-6f3c.openshiftworkshop.com
+  routeSuffix: apps.mnairn-75c1.openshiftworkshop.com
   #Storage class for RWX system PVC
   rwxStorageClass: ""
   wildcardPolicy: Subdomain

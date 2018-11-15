@@ -7,12 +7,15 @@ import (
 // ThreeScaleTenantSpec defines the desired state of ThreeScaleTenant
 type ThreeScaleTenantSpec struct {
 	Name             string                   `json:"name"`
+	ThreeScaleName   string                   `json:"threeScaleName"`
 	AdminUsername    string                   `json:"adminUsername"`
 	AdminEmail       string                   `json:"adminEmail"`
+	AdminPassword    string                   `json:"adminPassword"`
 	AdminCredentials string                   `json:"adminCredentials"`
 	Users            []ThreeScaleUser         `json:"users"`
 	SeedUsers        SeedUsersConfig          `json:"seedUsers"`
 	AuthProviders    []ThreeScaleAuthProvider `json:"authProviders"`
+	Tenant           ThreeScaleAccount        `json:"tenant"`
 }
 
 // ThreeScaleTenantStatus defines the observed state of ThreeScaleTenant
@@ -83,6 +86,34 @@ type ThreeScaleAuthProvider struct {
 	Site                           string `json:"site,omitempty"`
 	SkipSslCertificateVerification bool   `json:"skip_ssl_certificate_verification,omitempty"`
 	Published                      bool   `json:"published,omitempty"`
+}
+
+type ThreeScaleSignupRequest struct {
+	OrgName  string `json:"org_name,omitempty"`
+	UserName string `json:"username,omitempty"`
+	Email    string `json:"email,omitempty"`
+	Password string `json:"password,omitempty"`
+}
+
+type ThreeScaleSignupResponse struct {
+	Signup *ThreeScaleSignup `json:"signup"`
+}
+
+type ThreeScaleSignup struct {
+	Account     *ThreeScaleAccount     `json:"account"`
+	AccessToken *ThreeScaleAccessToken `json:"access_token"`
+}
+
+type ThreeScaleAccount struct {
+	ID          int    `json:"id,omitempty"`
+	Domain      string `json:"domain,omitempty"`
+	AdminDomain string `json:"admin_domain,omitempty"`
+	State       string `json:"state,omitempty"`
+}
+
+type ThreeScaleAccessToken struct {
+	ID    int    `json:"id,omitempty"`
+	Value string `json:"value,omitempty"`
 }
 
 type ThreeScaleUserPair struct {

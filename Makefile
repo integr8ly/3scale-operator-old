@@ -96,17 +96,20 @@ uninstall:
 	-kubectl delete namespace $(NAMESPACE)
 
 .PHONY: create-examples
-create-examples:
+create-examples: create-example-threescale create-example-threescaletenant
+
+.PHONY: create-example-threescale
+create-example-threescale:
 	-kubectl create -f deploy/crds/threescale_v1alpha1_threescale_cr.yaml -n $(NAMESPACE)
 
-.PHONY: create-examples
-create-example-tenant:
+.PHONY: create-example-threescaletenant
+create-example-threescaletenant:
 	-kubectl create -f deploy/crds/threescale_v1alpha1_threescaletenant_cr.yaml -n $(NAMESPACE)
 
 .PHONY: delete-examples
 delete-examples:
 	-kubectl delete threescales example-threescale
-	-kubectl delete threescales example-threescaletenant
+	-kubectl delete threescaletenants example-threescaletenant
 
 .PHONY: deploy
 deploy:

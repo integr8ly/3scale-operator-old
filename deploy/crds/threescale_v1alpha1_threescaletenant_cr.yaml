@@ -3,13 +3,14 @@ kind: ThreeScaleTenant
 metadata:
   name: example-threescaletenant
 spec:
-  name: 3scale
+  name: test
+  threeScaleName: example-threescale
   #Admin Username
   adminUsername: admin@example.com
   #Admin Email
   adminEmail: admin@example.com
-  #ToDo This is only here temporarily, should be generated per realm and injected into the spec
-  adminCredentials: "admin-credentials"
+  #Admin Password
+  adminPassword: Password1
   #Seed Users
   seedUsers:
     count: 2

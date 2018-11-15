@@ -144,14 +144,20 @@ func (r *ReconcileThreeScale) Credentials(obj *threescalev1alpha1.ThreeScale) (*
 	// fill in any defaults that are not set
 	ts.Defaults()
 
-	//Create admin access token
-	adminSecret, err := r.createOpaqueSecret("admin-credentials", "ADMIN_ACCESS_TOKEN", ts)
+	//Create tenant admin access token
+
+	var tenantName = "3scale"
+	if ts.Spec.TenantName != "" {
+		tenantName = ts.Spec.TenantName
+	}
+	secretName := fmt.Sprintf("%s-admin-credentials", tenantName)
+	adminSecret, err := r.createOpaqueSecret(secretName, "ADMIN_ACCESS_TOKEN", ts)
 	if err != nil {
 		return ts, errors.Wrap(err, "failed to create admin token")
 	}
 	ts.Spec.AdminCredentials = adminSecret.GetName()
 	//Create master access token
-	masterSecret, err := r.createOpaqueSecret("3scale-master-access-token", "MASTER_ACCESS_TOKEN", ts)
+	masterSecret, err := r.createOpaqueSecret("master-credentials", "MASTER_ACCESS_TOKEN", ts)
 	if err != nil {
 		return ts, errors.Wrap(err, "failed to create master access token")
 	}
@@ -246,6 +252,9 @@ func (r *ReconcileThreeScale) InstallThreeScale(ts *threescalev1alpha1.ThreeScal
 	for k, v := range masterCreds.Data {
 		decodedParams[k] = string(v)
 	}
+	if ts.Spec.TenantName != "" {
+		decodedParams["TENANT_NAME"] = string(ts.Spec.TenantName)
+	}
 	if ts.Spec.RWXStorageClass != "" {
 		decodedParams["RWX_STORAGE_CLASS"] = string(ts.Spec.RWXStorageClass)
 	}
@@ -331,6 +340,29 @@ func (r *ReconcileThreeScale) CheckInstallResourcesReady(ts *threescalev1alpha1.
 
 	if err = r.client.Update(context.TODO(), adminCreds); err != nil {
 		return nil, errors.Wrap(err, "could not update admin credentials")
+	}
+
+	masterRoute := &routev1.Route{}
+	err = r.client.Get(context.TODO(), types.NamespacedName{Name: "system-master-admin-route", Namespace: ts.Namespace}, masterRoute)
+	if err != nil {
+		return nil, errors.Wrap(err, "failed to get master admin route")
+	}
+
+	masterProtocol := "https"
+	if masterRoute.Spec.TLS == nil {
+		masterProtocol = "http"
+	}
+	masterAdminUrl := fmt.Sprintf("%v://%v", masterProtocol, masterRoute.Spec.Host)
+
+	masterAdminCreds := &v1.Secret{}
+	err = r.client.Get(context.TODO(), types.NamespacedName{Name: ts.Spec.MasterCredentials, Namespace: ts.Namespace}, masterAdminCreds)
+	if err != nil {
+		return nil, errors.Wrap(err, "failed to get the secret for the master admin credentials")
+	}
+	masterAdminCreds.Data["ADMIN_URL"] = []byte(masterAdminUrl)
+
+	if err = r.client.Update(context.TODO(), masterAdminCreds); err != nil {
+		return nil, errors.Wrap(err, "could not update master admin credentials")
 	}
 
 	ts.Status.Ready = true

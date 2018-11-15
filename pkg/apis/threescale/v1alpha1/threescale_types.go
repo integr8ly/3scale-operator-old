@@ -33,6 +33,7 @@ type ThreeScale struct {
 
 type ThreeScaleSpec struct {
 	Namespace         string `json:"namespace"`
+	TenantName        string `json:"tenantName"`
 	AdminCredentials  string `json:"adminCredentials"`
 	MasterCredentials string `json:"masterCredentials"`
 	RouteSuffix       string `json:"routeSuffix"`

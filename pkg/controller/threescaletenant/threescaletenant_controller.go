@@ -6,11 +6,17 @@ import (
 	"github.com/integr8ly/3scale-operator/pkg/threescale"
 	"github.com/pkg/errors"
 	log "github.com/sirupsen/logrus"
+	"k8s.io/api/core/v1"
+	"k8s.io/apimachinery/pkg/types"
+	"k8s.io/apimachinery/pkg/util/intstr"
 	"reflect"
+	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
 	"time"
 
 	threescalev1alpha1 "github.com/integr8ly/3scale-operator/pkg/apis/threescale/v1alpha1"
+	routev1 "github.com/openshift/api/route/v1"
 	k8errors "k8s.io/apimachinery/pkg/api/errors"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/controller"
@@ -90,7 +96,42 @@ func (r *ReconcileThreeScaleTenant) Reconcile(request reconcile.Request) (reconc
 	// fill in any defaults that are not set
 	tst.Defaults()
 
-	tsClient, err := r.tsFactory.AuthenticatedClient(*tst)
+	resyncDuration := time.Second * time.Duration(10)
+
+	ts := &threescalev1alpha1.ThreeScale{}
+	err = r.client.Get(context.TODO(), types.NamespacedName{Name: tst.Spec.ThreeScaleName, Namespace: tst.Namespace}, ts)
+	if err != nil {
+		log.Debugf("failed to get threescale resource (%s)", tst.Spec.ThreeScaleName)
+		return reconcile.Result{Requeue: true, RequeueAfter: resyncDuration}, errors.Wrap(err, "failed to get threescale resource")
+	}
+
+	if err := controllerutil.SetControllerReference(ts, tst, r.scheme); err != nil {
+		log.Debugf("failed to set owner (%s)", tst.Spec.ThreeScaleName)
+		return reconcile.Result{Requeue: true, RequeueAfter: resyncDuration}, errors.Wrap(err, "failed to set owner")
+	}
+
+	if !ts.Status.Ready {
+		log.Debugf("threescale resource (%s) not ready yet", tst.Spec.ThreeScaleName)
+		return reconcile.Result{Requeue: true, RequeueAfter: resyncDuration}, nil
+	}
+
+	tst, err = r.CreateTenant(ts, tst)
+	if err != nil {
+		return reconcile.Result{}, errors.Wrap(err, "error creating tenant")
+	}
+
+	tst, err = r.ReconcileRoutes(tst)
+	if err != nil {
+		return reconcile.Result{}, errors.Wrap(err, "error reconciling routes")
+	}
+
+	tstAdminCredentials := &v1.Secret{}
+	err = r.client.Get(context.TODO(), types.NamespacedName{Name: tst.Spec.AdminCredentials, Namespace: tst.Namespace}, tstAdminCredentials)
+	if err != nil {
+		return reconcile.Result{}, errors.Wrap(err, "failed to get admin credentials")
+	}
+
+	tsClient, err := r.tsFactory.AuthenticatedClient(string(tstAdminCredentials.Data["ADMIN_URL"]), string(tstAdminCredentials.Data["ADMIN_ACCESS_TOKEN"]))
 	if err != nil {
 		return reconcile.Result{}, errors.Wrap(err, "failed to get authenticated client for threescale")
 	}
@@ -106,8 +147,162 @@ func (r *ReconcileThreeScaleTenant) Reconcile(request reconcile.Request) (reconc
 	}
 	log.Info("Reconcile Users: done")
 
-	resyncDuration := time.Second * time.Duration(10)
 	return reconcile.Result{Requeue: true, RequeueAfter: resyncDuration}, r.client.Update(context.TODO(), tst)
+}
+
+func (r *ReconcileThreeScaleTenant) createRoute(name, host, port, serviceName string, owner *threescalev1alpha1.ThreeScaleTenant) (*routev1.Route, error) {
+	route := &routev1.Route{
+		TypeMeta: metav1.TypeMeta{
+			APIVersion: "v1",
+			Kind:       "Route",
+		},
+		ObjectMeta: metav1.ObjectMeta{
+			Namespace: owner.Namespace,
+			Name:      name,
+		},
+		Spec: routev1.RouteSpec{
+			Host: host,
+			Port: &routev1.RoutePort{
+				TargetPort: intstr.IntOrString{
+					Type:   intstr.String,
+					StrVal: port,
+				},
+			},
+			TLS: &routev1.TLSConfig{
+				InsecureEdgeTerminationPolicy: routev1.InsecureEdgeTerminationPolicyNone,
+				Termination:                   routev1.TLSTerminationEdge,
+			},
+			To: routev1.RouteTargetReference{
+				Kind: "Service",
+				Name: serviceName,
+			},
+		},
+	}
+
+	if err := controllerutil.SetControllerReference(owner, route, r.scheme); err != nil {
+		return nil, err
+	}
+
+	found := &routev1.Route{}
+	err := r.client.Get(context.TODO(), types.NamespacedName{Name: route.Name, Namespace: route.Namespace}, found)
+	if err != nil && k8errors.IsNotFound(err) {
+		log.Infof("Creating new route %s/%s\n", route.Namespace, route.Name)
+		err = r.client.Create(context.TODO(), route)
+		if err != nil {
+			return nil, err
+		}
+	} else if err != nil {
+		return nil, err
+	} else {
+		route = found
+	}
+	return route, nil
+}
+
+func (r *ReconcileThreeScaleTenant) createOpaqueSecret(name, value, key string, owner *threescalev1alpha1.ThreeScaleTenant) (*v1.Secret, error) {
+	data := map[string][]byte{key: []byte(value)}
+	secret := &v1.Secret{
+		TypeMeta: metav1.TypeMeta{
+			APIVersion: "v1",
+			Kind:       "Secret",
+		},
+		ObjectMeta: metav1.ObjectMeta{
+			Namespace: owner.Namespace,
+			Name:      name,
+		},
+		Data: data,
+		Type: "Opaque",
+	}
+
+	if err := controllerutil.SetControllerReference(owner, secret, r.scheme); err != nil {
+		return nil, err
+	}
+
+	found := &v1.Secret{}
+	err := r.client.Get(context.TODO(), types.NamespacedName{Name: secret.Name, Namespace: secret.Namespace}, found)
+	if err != nil && k8errors.IsNotFound(err) {
+		log.Infof("Creating new secret %s/%s\n", secret.Namespace, secret.Name)
+		err = r.client.Create(context.TODO(), secret)
+		if err != nil {
+			return nil, err
+		}
+	} else if err != nil {
+		return nil, err
+	} else {
+		secret = found
+	}
+	return secret, nil
+}
+
+func (r *ReconcileThreeScaleTenant) CreateTenant(ts *threescalev1alpha1.ThreeScale, tst *threescalev1alpha1.ThreeScaleTenant) (*threescalev1alpha1.ThreeScaleTenant, error) {
+	if tst.Spec.Tenant.ID == 0 {
+		tsMasterCredentials := &v1.Secret{}
+		err := r.client.Get(context.TODO(), types.NamespacedName{Name: ts.Spec.MasterCredentials, Namespace: ts.Namespace}, tsMasterCredentials)
+		if err != nil {
+			return nil, errors.Wrap(err, "failed to get master credentials")
+		}
+
+		tsClient, err := r.tsFactory.AuthenticatedClient(string(tsMasterCredentials.Data["ADMIN_URL"]), string(tsMasterCredentials.Data["MASTER_ACCESS_TOKEN"]))
+		if err != nil {
+			return nil, errors.Wrap(err, "failed to get authenticated client for threescale")
+		}
+
+		signupRequest := &threescalev1alpha1.ThreeScaleSignupRequest{
+			OrgName:  tst.Spec.Name,
+			Email:    tst.Spec.AdminEmail,
+			UserName: tst.Spec.AdminUsername,
+			Password: tst.Spec.AdminPassword,
+		}
+
+		signupResponse, err := tsClient.CreateTenant(signupRequest)
+		if err != nil {
+			return nil, errors.Wrap(err, "failed to create signupRequest")
+		}
+		tst.Spec.Tenant = *signupResponse.Signup.Account
+		r.client.Update(context.TODO(), tst) //Todo
+
+		secretName := fmt.Sprintf("%s-provider-admin-credentials", tst.Spec.Name)
+		adminSecret, err := r.createOpaqueSecret(secretName, signupResponse.Signup.AccessToken.Value, "ADMIN_ACCESS_TOKEN", tst)
+		if err != nil {
+			return nil, errors.Wrap(err, "failed to create admin token")
+		}
+		tst.Spec.AdminCredentials = adminSecret.GetName()
+		r.client.Update(context.TODO(), tst) //Todo
+	}
+	return tst, nil
+}
+
+func (r *ReconcileThreeScaleTenant) ReconcileRoutes(tst *threescalev1alpha1.ThreeScaleTenant) (*threescalev1alpha1.ThreeScaleTenant, error) {
+	adminRouteName := fmt.Sprintf("%s-provider-admin-route", tst.Spec.Name)
+	adminRoute, err := r.createRoute(adminRouteName, tst.Spec.Tenant.AdminDomain, "http", "system-provider", tst)
+	if err != nil {
+		return nil, errors.Wrap(err, "failed to create/find admin route")
+	}
+
+	protocol := "https"
+	if adminRoute.Spec.TLS == nil {
+		protocol = "http"
+	}
+	adminUrl := fmt.Sprintf("%v://%v", protocol, adminRoute.Spec.Host)
+
+	adminCreds := &v1.Secret{}
+	err = r.client.Get(context.TODO(), types.NamespacedName{Name: tst.Spec.AdminCredentials, Namespace: tst.Namespace}, adminCreds)
+	if err != nil {
+		return nil, errors.Wrap(err, "failed to get the secret for the admin credentials")
+	}
+	adminCreds.Data["ADMIN_URL"] = []byte(adminUrl)
+
+	if err = r.client.Update(context.TODO(), adminCreds); err != nil {
+		return nil, errors.Wrap(err, "could not update admin credentials")
+	}
+
+	routeName := fmt.Sprintf("%s-provider-developer-route", tst.Spec.Name)
+	_, err = r.createRoute(routeName, tst.Spec.Tenant.Domain, "http", "system-developer", tst)
+	if err != nil {
+		return nil, errors.Wrap(err, "failed to create/find developer route")
+	}
+
+	return tst, nil
 }
 
 func (r *ReconcileThreeScaleTenant) ReconcileAuthProviders(tst *threescalev1alpha1.ThreeScaleTenant, tsClient threescale.ThreeScaleInterface) (*threescalev1alpha1.ThreeScaleTenant, error) {

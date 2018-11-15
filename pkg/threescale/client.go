@@ -2,7 +2,6 @@ package threescale
 
 import (
 	"bytes"
-	"context"
 	"crypto/tls"
 	"encoding/json"
 	"fmt"
@@ -10,8 +9,6 @@ import (
 	"github.com/pkg/errors"
 	"github.com/sirupsen/logrus"
 	"io/ioutil"
-	"k8s.io/api/core/v1"
-	"k8s.io/apimachinery/pkg/types"
 	"net/http"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"time"
@@ -39,9 +36,23 @@ type Client struct {
 // T is a generic type for spec resources
 type T interface{}
 
+func (c *Client) CreateTenant(tenant *threescalev1alpha1.ThreeScaleSignupRequest) (*threescalev1alpha1.ThreeScaleSignupResponse, error) {
+	resourcePath := "master/api/providers.json"
+	result, err := c.create(tenant, resourcePath, "providers", func(body []byte) (T, error) {
+		var signup *threescalev1alpha1.ThreeScaleSignupResponse
+		err := json.Unmarshal(body, &signup)
+		return signup, err
+	})
+	if err != nil {
+		return nil, err
+	}
+	return result.(*threescalev1alpha1.ThreeScaleSignupResponse), err
+}
+
 func (c *Client) CreateUser(user *threescalev1alpha1.ThreeScaleUser) error {
 	resourcePath := "admin/api/users.json"
-	return c.create(user, resourcePath, "users")
+	_, err := c.create(user, resourcePath, "users", func(body []byte) (T, error) { return nil, nil })
+	return err
 }
 
 func (c *Client) GetUser(id int) (*threescalev1alpha1.ThreeScaleApiUser, error) {
@@ -87,7 +98,8 @@ func (c *Client) ListUsers() ([]*threescalev1alpha1.ThreeScaleApiUser, error) {
 
 func (c *Client) CreateAuthProvider(user *threescalev1alpha1.ThreeScaleAuthProvider) error {
 	resourcePath := "admin/api/account/authentication_providers.json"
-	return c.create(user, resourcePath, "authentication_providers")
+	_, err := c.create(user, resourcePath, "authentication_providers", func(body []byte) (T, error) { return nil, nil })
+	return err
 }
 
 func (c *Client) ListAuthProviders() ([]*threescalev1alpha1.ThreeScaleApiAuthProvider, error) {
@@ -104,12 +116,12 @@ func (c *Client) ListAuthProviders() ([]*threescalev1alpha1.ThreeScaleApiAuthPro
 }
 
 // Generic create function for creating new ThreeScale resources
-func (c *Client) create(obj T, resourcePath, resourceName string) error {
+func (c *Client) create(obj T, resourcePath, resourceName string, unMarshalFunc func(body []byte) (T, error)) (T, error) {
 	reqParams := fmt.Sprintf("access_token=%s", c.token)
 
 	jsonValue, err := json.Marshal(obj)
 	if err != nil {
-		return err
+		return nil, err
 	}
 
 	req, err := http.NewRequest(
@@ -118,24 +130,38 @@ func (c *Client) create(obj T, resourcePath, resourceName string) error {
 		bytes.NewBuffer(jsonValue),
 	)
 	if err != nil {
-		return errors.Wrapf(err, "error creating POST %s request", resourceName)
+		return nil, errors.Wrapf(err, "error creating POST %s request", resourceName)
 	}
 
 	req.Header.Set("Content-Type", "application/json")
 	res, err := c.requester.Do(req)
 
 	if err != nil {
-		return errors.Wrapf(err, "error performing POST %s request", resourceName)
+		return nil, errors.Wrapf(err, "error performing POST %s request", resourceName)
 	}
 	defer res.Body.Close()
 
 	logrus.Debugf("response status: %v, %v", res.StatusCode, res.Status)
 	if res.StatusCode != 201 {
-		return fmt.Errorf("failed to create %s: (%d) %s", resourceName, res.StatusCode, res.Status)
+		return nil, fmt.Errorf("failed to create %s: (%d) %s", resourceName, res.StatusCode, res.Status)
 	}
 
+	body, err := ioutil.ReadAll(res.Body)
+	if err != nil {
+		return nil, errors.Wrapf(err, "error reading %s GET response", resourceName)
+	}
+
+	logrus.Println("------")
+	logrus.Debugf("%s POST: %+v\n", resourceName, string(body))
+	logrus.Println("------")
+
+	obj, err = unMarshalFunc(body)
+	if err != nil {
+		return nil, err
+	}
+	logrus.Debugf("%s POST= %#v", resourceName, obj)
 	logrus.Debugf("response:", res)
-	return nil
+	return obj, nil
 }
 
 // Generic get function for returning a ThreeScale resource
@@ -259,6 +285,8 @@ type ThreeScaleInterface interface {
 	//GetAuthProvider(id int) (*threescalev1alpha1.ThreeScaleAuthProvider, error)
 	//UpdateAuthProvider(id int, authProvider *threescalev1alpha1.ThreeScaleAuthProvider) error
 	ListAuthProviders() ([]*threescalev1alpha1.ThreeScaleApiAuthProvider, error)
+
+	CreateTenant(authProvider *threescalev1alpha1.ThreeScaleSignupRequest) (*threescalev1alpha1.ThreeScaleSignupResponse, error)
 }
 
 type ThreeScaleClientFactory interface {
@@ -270,14 +298,11 @@ type ThreeScaleFactory struct {
 }
 
 // AuthenticatedClient returns an authenticated client for requesting endpoints from the ThreeScale api
-func (tsf *ThreeScaleFactory) AuthenticatedClient(ts threescalev1alpha1.ThreeScaleTenant) (ThreeScaleInterface, error) {
-	adminCreds := &v1.Secret{}
-	err := tsf.Client.Get(context.TODO(), types.NamespacedName{Name: ts.Spec.AdminCredentials, Namespace: ts.Namespace}, adminCreds)
-	if err != nil {
-		return nil, errors.Wrap(err, "failed to get the admin credentials")
-	}
-	token := string(adminCreds.Data["ADMIN_ACCESS_TOKEN"])
-	url := string(adminCreds.Data["ADMIN_URL"])
+func (tsf *ThreeScaleFactory) AuthenticatedClient(url, token string) (ThreeScaleInterface, error) {
+
+	fmt.Printf("URL = %s", url)
+	fmt.Printf("Token = %s", token)
+
 	client := &Client{
 		URL:       url,
 		token:     token,
