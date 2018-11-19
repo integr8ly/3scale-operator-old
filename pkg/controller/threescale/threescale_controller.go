@@ -9,7 +9,6 @@ import (
 	"k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/client-go/rest"
-	"reflect"
 	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
 	"strings"
 	"time"
@@ -115,7 +114,7 @@ func (r *ReconcileThreeScale) Reconcile(request reconcile.Request) (reconcile.Re
 			log.Errorf("phase reconcile threescale failed: +v", err)
 			return reconcile.Result{}, errors.Wrap(err, "phase reconcile threescale failed")
 		}
-		resyncDuration := time.Second * time.Duration(60)
+		resyncDuration := time.Second * time.Duration(10)
 		return reconcile.Result{Requeue: true, RequeueAfter: resyncDuration}, r.client.Update(context.TODO(), tsState)
 	}
 
@@ -145,14 +144,20 @@ func (r *ReconcileThreeScale) Credentials(obj *threescalev1alpha1.ThreeScale) (*
 	// fill in any defaults that are not set
 	ts.Defaults()
 
-	//Create admin access token
-	adminSecret, err := r.createOpaqueSecret("admin-credentials", "ADMIN_ACCESS_TOKEN", ts)
+	//Create tenant admin access token
+
+	var tenantName = "3scale"
+	if ts.Spec.TenantName != "" {
+		tenantName = ts.Spec.TenantName
+	}
+	secretName := fmt.Sprintf("%s-admin-credentials", tenantName)
+	adminSecret, err := r.createOpaqueSecret(secretName, "ADMIN_ACCESS_TOKEN", ts)
 	if err != nil {
 		return ts, errors.Wrap(err, "failed to create admin token")
 	}
 	ts.Spec.AdminCredentials = adminSecret.GetName()
 	//Create master access token
-	masterSecret, err := r.createOpaqueSecret("3scale-master-access-token", "MASTER_ACCESS_TOKEN", ts)
+	masterSecret, err := r.createOpaqueSecret("master-credentials", "MASTER_ACCESS_TOKEN", ts)
 	if err != nil {
 		return ts, errors.Wrap(err, "failed to create master access token")
 	}
@@ -224,22 +229,6 @@ func (r *ReconcileThreeScale) ReconcileThreeScale(obj *threescalev1alpha1.ThreeS
 	}
 	log.Info("Resources Ready: yes")
 
-	tsClient, err := r.tsFactory.AuthenticatedClient(*ts)
-	if err != nil {
-		return nil, errors.Wrap(err, "failed to get authenticated client for threescale")
-	}
-
-	ts, err = r.ReconcileAuthProviders(ts, tsClient)
-	if err != nil {
-		return nil, errors.Wrap(err, "error reconciling auth providers")
-	}
-	log.Info("Reconcile Authentication Providers: done")
-	ts, err = r.ReconcileUsers(ts, tsClient)
-	if err != nil {
-		return nil, errors.Wrap(err, "error reconciling users")
-	}
-	log.Info("Reconcile Users: done")
-
 	return ts, nil
 }
 
@@ -262,6 +251,9 @@ func (r *ReconcileThreeScale) InstallThreeScale(ts *threescalev1alpha1.ThreeScal
 	}
 	for k, v := range masterCreds.Data {
 		decodedParams[k] = string(v)
+	}
+	if ts.Spec.TenantName != "" {
+		decodedParams["TENANT_NAME"] = string(ts.Spec.TenantName)
 	}
 	if ts.Spec.RWXStorageClass != "" {
 		decodedParams["RWX_STORAGE_CLASS"] = string(ts.Spec.RWXStorageClass)
@@ -350,138 +342,31 @@ func (r *ReconcileThreeScale) CheckInstallResourcesReady(ts *threescalev1alpha1.
 		return nil, errors.Wrap(err, "could not update admin credentials")
 	}
 
+	masterRoute := &routev1.Route{}
+	err = r.client.Get(context.TODO(), types.NamespacedName{Name: "system-master-admin-route", Namespace: ts.Namespace}, masterRoute)
+	if err != nil {
+		return nil, errors.Wrap(err, "failed to get master admin route")
+	}
+
+	masterProtocol := "https"
+	if masterRoute.Spec.TLS == nil {
+		masterProtocol = "http"
+	}
+	masterAdminUrl := fmt.Sprintf("%v://%v", masterProtocol, masterRoute.Spec.Host)
+
+	masterAdminCreds := &v1.Secret{}
+	err = r.client.Get(context.TODO(), types.NamespacedName{Name: ts.Spec.MasterCredentials, Namespace: ts.Namespace}, masterAdminCreds)
+	if err != nil {
+		return nil, errors.Wrap(err, "failed to get the secret for the master admin credentials")
+	}
+	masterAdminCreds.Data["ADMIN_URL"] = []byte(masterAdminUrl)
+
+	if err = r.client.Update(context.TODO(), masterAdminCreds); err != nil {
+		return nil, errors.Wrap(err, "could not update master admin credentials")
+	}
+
 	ts.Status.Ready = true
 	return ts, nil
-}
-
-func (r *ReconcileThreeScale) ReconcileAuthProviders(ts *threescalev1alpha1.ThreeScale, tsClient threescale.ThreeScaleInterface) (*threescalev1alpha1.ThreeScale, error) {
-	apiAuthProviders, err := tsClient.ListAuthProviders()
-	if err != nil {
-		return nil, errors.Wrap(err, "error retrieving auth providers from threescale")
-	}
-	tsAuthProviders := map[string]*threescalev1alpha1.ThreeScaleAuthProvider{}
-	for i := range apiAuthProviders {
-		tsAuthProviders[apiAuthProviders[i].AuthProvider.Name] = apiAuthProviders[i].AuthProvider
-	}
-
-	specAuthProviders := map[string]*threescalev1alpha1.ThreeScaleAuthProvider{}
-	for i := range ts.Spec.AuthProviders {
-		specAuthProviders[ts.Spec.AuthProviders[i].Name] = &ts.Spec.AuthProviders[i]
-	}
-
-	authproviderPairsList := map[string]*threescalev1alpha1.ThreeScaleAuthProviderPair{}
-	for k, _ := range specAuthProviders {
-		provider := specAuthProviders[k]
-		authproviderPairsList[provider.Name] = &threescalev1alpha1.ThreeScaleAuthProviderPair{
-			SpecAuthProvider: provider,
-			TsAuthProvider:   tsAuthProviders[provider.Name],
-		}
-	}
-
-	for i := range authproviderPairsList {
-		err := reconcileAuthProvider(authproviderPairsList[i].TsAuthProvider, authproviderPairsList[i].SpecAuthProvider, tsClient)
-		if err != nil {
-			return nil, err
-		}
-	}
-
-	return ts, nil
-}
-
-func reconcileAuthProvider(tsAuthProvider, specAuthProvider *threescalev1alpha1.ThreeScaleAuthProvider, tsClient threescale.ThreeScaleInterface) error {
-	if tsAuthProvider == nil {
-		log.Infof("create auth provider: %s", specAuthProvider.Name)
-		err := tsClient.CreateAuthProvider(specAuthProvider)
-		if err != nil {
-			return err
-		}
-	} else {
-		//ToDo implement update
-	}
-	return nil
-}
-
-func (r *ReconcileThreeScale) ReconcileUsers(ts *threescalev1alpha1.ThreeScale, tsClient threescale.ThreeScaleInterface) (*threescalev1alpha1.ThreeScale, error) {
-	apiUsers, err := tsClient.ListUsers()
-	if err != nil {
-		return nil, errors.Wrap(err, "error retrieving apiUsers from threescale")
-	}
-	tsUsers := map[string]*threescalev1alpha1.ThreeScaleUser{}
-	for i := range apiUsers {
-		tsUsers[apiUsers[i].User.UserName] = apiUsers[i].User
-	}
-
-	specUsers := map[string]*threescalev1alpha1.ThreeScaleUser{}
-	for i := range ts.Spec.Users {
-		specUsers[ts.Spec.Users[i].UserName] = &ts.Spec.Users[i]
-	}
-
-	if ts.Spec.SeedUsers.Count != 0 {
-		for i := 1; i <= ts.Spec.SeedUsers.Count; i++ {
-			username := fmt.Sprintf(ts.Spec.SeedUsers.NameFormat, i)
-			if specUsers[username] == nil {
-				evalUser := &threescalev1alpha1.ThreeScaleUser{
-					Email:    fmt.Sprintf(ts.Spec.SeedUsers.EmailFormat, i),
-					UserName: username,
-					Password: ts.Spec.SeedUsers.Password,
-					Role:     ts.Spec.SeedUsers.Role,
-				}
-				ts.Spec.Users = append(ts.Spec.Users, *evalUser)
-				specUsers[username] = evalUser
-			}
-		}
-	}
-
-	userPairsList := map[string]*threescalev1alpha1.ThreeScaleUserPair{}
-	for k, _ := range specUsers {
-		user := specUsers[k]
-		userPairsList[user.UserName] = &threescalev1alpha1.ThreeScaleUserPair{
-			SpecUser: user,
-			TsUser:   tsUsers[user.UserName],
-		}
-	}
-
-	for i := range userPairsList {
-		err := reconcileUser(userPairsList[i].TsUser, userPairsList[i].SpecUser, tsClient)
-		if err != nil {
-			return nil, err
-		}
-	}
-
-	return ts, nil
-}
-
-func reconcileUser(tsUser, specUser *threescalev1alpha1.ThreeScaleUser, tsClient threescale.ThreeScaleInterface) error {
-	if tsUser == nil {
-		log.Infof("create user: %s", specUser.UserName)
-		return tsClient.CreateUser(specUser)
-	}
-	tsUser.Password = specUser.Password
-	if !reflect.DeepEqual(tsUser, specUser) {
-		log.Infof("update user: %s", specUser.UserName)
-		specUser.ID = tsUser.ID
-		err := tsClient.UpdateUser(specUser.ID, specUser)
-		if err != nil {
-			return err
-		}
-		if specUser.Role != "" && specUser.Role != tsUser.Role {
-			log.Infof("update user role: %s, %s", specUser.UserName, specUser.Role)
-			err = tsClient.UpdateUserRole(specUser.ID, specUser.Role)
-			if err != nil {
-				return err
-			}
-		} else {
-			specUser.Role = tsUser.Role
-		}
-		specUser.State = tsUser.State
-	}
-
-	if specUser.State == "pending" {
-		log.Infof("activate user: %s", specUser.UserName)
-		return tsClient.ActivateUser(specUser.ID)
-	}
-
-	return nil
 }
 
 func GeneratePassword() (string, error) {

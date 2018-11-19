@@ -77,27 +77,39 @@ check: check-gofmt test-unit
 install: install-crds
 	-oc new-project $(NAMESPACE)
 	-oc delete limits $(NAMESPACE)-core-resource-limits
+	-kubectl create --insecure-skip-tls-verify -f deploy/service_account.yaml -n $(NAMESPACE)
 	-kubectl create --insecure-skip-tls-verify -f deploy/role.yaml -n $(NAMESPACE)
 	-kubectl create --insecure-skip-tls-verify -f deploy/role_binding.yaml -n $(NAMESPACE)
 
 .PHONY: install-crds
 install-crds:
 	-kubectl create -f deploy/crds/threescale_v1alpha1_threescale_crd.yaml
+	-kubectl create -f deploy/crds/threescale_v1alpha1_threescaletenant_crd.yaml
 
 .PHONY: uninstall
 uninstall:
 	-kubectl delete role 3scale-operator -n $(NAMESPACE)
 	-kubectl delete rolebinding 3scale-operator -n $(NAMESPACE)
+	-kubectl delete serviceaccount 3scale-operator -n $(NAMESPACE)
 	-kubectl delete crd threescales.threescale.net
+	-kubectl delete crd threescaletenants.threescale.net
 	-kubectl delete namespace $(NAMESPACE)
 
 .PHONY: create-examples
-create-examples:
+create-examples: create-example-threescale create-example-threescaletenant
+
+.PHONY: create-example-threescale
+create-example-threescale:
 	-kubectl create -f deploy/crds/threescale_v1alpha1_threescale_cr.yaml -n $(NAMESPACE)
+
+.PHONY: create-example-threescaletenant
+create-example-threescaletenant:
+	-kubectl create -f deploy/crds/threescale_v1alpha1_threescaletenant_cr.yaml -n $(NAMESPACE)
 
 .PHONY: delete-examples
 delete-examples:
 	-kubectl delete threescales example-threescale
+	-kubectl delete threescaletenants example-threescaletenant
 
 .PHONY: deploy
 deploy:
