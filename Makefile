@@ -5,6 +5,7 @@ SHELL = /bin/bash
 TAG = 0.0.4
 PKG = github.com/integr8ly/3scale-operator
 TEST_DIRS     ?= $(shell sh -c "find $(TOP_SRC_DIRS) -name \\*_test.go -exec dirname {} \\; | sort | uniq")
+COMPILE_TARGET = build/_output/bin/3scale-operator
 
 .PHONY: check-gofmt
 check-gofmt:
@@ -35,6 +36,13 @@ setup:
 .PHONY: build-image
 build-image: packr compile build packr-clean
 
+.phony: docker-build-image
+docker-build-image: packr compile docker-build packr-clean
+
+.PHONY: docker-build
+docker-build: compile
+	docker build -t quay.io/${ORG}/${PROJECT}:${TAG} -f build/Dockerfile .
+
 .PHONY: build
 build:
 	operator-sdk build quay.io/${ORG}/${PROJECT}:${TAG}
@@ -46,6 +54,9 @@ push:
 .phony: build-and-push
 build-and-push: build-image push
 
+.PHONY: docker-build-and-push
+docker-build-and-push: docker-build-image push
+
 .PHONY: run
 run:
 	operator-sdk up local --namespace=${NAMESPACE} --operator-flags="--resync=10 --log-level=debug"
@@ -56,7 +67,7 @@ generate:
 
 .PHONY: compile
 compile:
-	go build -o=3scale-operator ./cmd/manager
+	go build -o=$(COMPILE_TARGET) ./cmd/manager
 
 .PHONY: packr
 packr:
