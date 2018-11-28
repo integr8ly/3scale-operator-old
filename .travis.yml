@@ -22,9 +22,8 @@ jobs:
         - cd $HOME/gopath/src/github.com/integr8ly/$OPERATOR_NAME && make setup test
     - stage: compile
       script:
-        - make setup
-        - make docker-build-image TAG=$(git rev-parse --short ${TRAVIS_COMMIT})
+        - make setup docker-build-image TAG=$(git rev-parse --short ${TRAVIS_COMMIT})
     - stage: push
       script:
         - docker login --password "$QUAY_PASSWORD" --username "$QUAY_USERNAME" quay.io
-        - make docker-build-and-push TAG=$(git rev-parse --short ${TRAVIS_COMMIT})
+        - make setup docker-build-and-push TAG=$(git rev-parse --short ${TRAVIS_COMMIT})
