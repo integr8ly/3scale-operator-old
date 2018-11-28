@@ -112,7 +112,7 @@ func (r *ReconcileThreeScale) Reconcile(request reconcile.Request) (reconcile.Re
 	case threescalev1alpha1.PhaseReconcileThreescale:
 		tsState, err := r.ReconcileThreeScale(instance)
 		if err != nil {
-			log.Errorf("phase reconcile threescale failed: +v", err)
+			log.Errorf("phase reconcile threescale failed: %+v", err)
 			return reconcile.Result{}, errors.Wrap(err, "phase reconcile threescale failed")
 		}
 		resyncDuration := time.Second * time.Duration(60)
