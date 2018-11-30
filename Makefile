@@ -34,10 +34,10 @@ setup:
 	@echo setup complete run make build deploy to build and deploy the operator to a local cluster
 
 .PHONY: build-image
-build-image: packr compile build packr-clean
+build-image: packr build packr-clean
 
 .phony: docker-build-image
-docker-build-image: packr compile docker-build packr-clean
+docker-build-image: packr docker-build packr-clean
 
 .PHONY: docker-build
 docker-build: compile
@@ -67,7 +67,7 @@ generate:
 
 .PHONY: compile
 compile:
-	go build -o=$(COMPILE_TARGET) ./cmd/manager
+	GOOS=linux GOARCH=amd64 CGO_ENABLED=0 go build -o=$(COMPILE_TARGET) ./cmd/manager
 
 .PHONY: packr
 packr:
