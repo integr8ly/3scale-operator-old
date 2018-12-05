@@ -29,5 +29,5 @@ jobs:
         - export TAG=$(git rev-parse --short ${TRAVIS_COMMIT})
         - docker login --password "$QUAY_PASSWORD" --username "$QUAY_USERNAME" quay.io
         - make setup docker-build-and-push TAG=$TAG
-        - docker tag quay.io/integreatly/3scale-operator:$TAG quay.io/integreatly/3scale-operator:$BRANCH
-        - docker push quay.io/integreatly/3scale-operator:$BRANCH
+        - docker tag quay.io/integreatly/$OPERATOR_NAME:$TAG quay.io/integreatly/$OPERATOR_NAME:$BRANCH
+        - docker push quay.io/integreatly/$OPERATOR_NAME:$BRANCH
