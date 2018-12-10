@@ -131,7 +131,7 @@ objects:
         openshift.io/display-name: AMP system ${AMP_RELEASE}
       from:
         kind: DockerImage
-        name: registry.access.redhat.com/3scale-amp22/system:1.7
+        name: registry.access.redhat.com/3scale-amp24/system:1.8-12
 - kind: ImageStream
   apiVersion: v1
   metadata:
@@ -151,7 +151,7 @@ objects:
         openshift.io/display-name: amp-backend ${AMP_RELEASE}
       from:
         kind: DockerImage
-        name: registry.access.redhat.com/3scale-amp22/backend:1.6
+        name: registry.access.redhat.com/3scale-amp24/backend:1.7-4
 - kind: ImageStream
   apiVersion: v1
   metadata:
@@ -171,7 +171,7 @@ objects:
         openshift.io/display-name: AMP APIcast ${AMP_RELEASE}
       from:
         kind: DockerImage
-        name: registry.access.redhat.com/3scale-amp22/apicast-gateway:1.8
+        name: registry.access.redhat.com/3scale-amp24/apicast-gateway:1.13-9
 - kind: ImageStream
   apiVersion: v1
   metadata:
@@ -852,7 +852,7 @@ objects:
 - apiVersion: v1
   kind: Route
   metadata:
-    name: system-provider-admin-route
+    name: system-provider-admin
   spec:
     host: ${TENANT_NAME}-admin.${WILDCARD_DOMAIN}
     to:
@@ -1794,7 +1794,7 @@ objects:
         openshift.io/display-name: AMP Zync ${AMP_RELEASE}
       from:
         kind: DockerImage
-        name: registry.access.redhat.com/3scale-amp22/zync:1.6
+        name: registry.access.redhat.com/3scale-amp24/zync:1.7-8
 - kind: Secret
   apiVersion: v1
   stringData:
