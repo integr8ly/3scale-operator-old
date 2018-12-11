@@ -234,11 +234,11 @@ func (r *ReconcileThreeScale) ReconcileThreeScale(obj *threescalev1alpha1.ThreeS
 		return nil, errors.Wrap(err, "error reconciling auth providers")
 	}
 	log.Info("Reconcile Authentication Providers: done")
-	ts, err = r.ReconcileUsers(ts, tsClient)
-	if err != nil {
-		return nil, errors.Wrap(err, "error reconciling users")
-	}
-	log.Info("Reconcile Users: done")
+	//ts, err = r.ReconcileUsers(ts, tsClient)
+	//if err != nil {
+	//	return nil, errors.Wrap(err, "error reconciling users")
+	//}
+	//log.Info("Reconcile Users: done")
 
 	return ts, nil
 }
