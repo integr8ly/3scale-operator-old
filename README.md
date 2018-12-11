@@ -14,18 +14,24 @@ A Kubernetes Operator based on the Operator SDK for installing and syncing resou
 ## Deploying
 
 ```sh
-#create required resources
-make install
-#deploy the latest version of the operator
-make deploy
-#create example threescale custom resource
-make create-examples
+make setup/dep
 ```
+__NOTE:__ The above command should be run only once on initial setup.
 
-##Development 
 
 ```sh
-make install run
+#create required resources
+make cluster/prepare
+#deploy the latest version of the operator
+make cluster/deploy
+#create example threescale custom resource
+make cluster/create/examples
+```
+
+## Development
+
+```sh
+make cluster/prepare code/run
 ```
 
 You should see something like:
@@ -44,12 +50,11 @@ DEBU[0001] starting threescales controller
 
 ```sh
 #builds image: quay.io/integreatly/3scale-operator:<tag>
-make build
+make image/build
 ```
 
 ## Running tests
 
 ```
-#Runs both gofmt checks and unit tests
-make test
+make test/unit
 ```
