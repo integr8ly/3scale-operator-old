@@ -274,7 +274,7 @@ objects:
               resources:
                 limits:
                   cpu: "2"
-                  memory: 32Gi
+                  memory: 6Gi
                 requests:
                   cpu: "1"
                   memory: 1Gi
@@ -447,7 +447,7 @@ objects:
               resources:
                 limits:
                   cpu: 500m
-                  memory: 32Gi
+                  memory: 6Gi
                 requests:
                   cpu: 150m
                   memory: 256Mi

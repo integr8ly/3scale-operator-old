@@ -10,9 +10,7 @@ spec:
   wildcardPolicy: Subdomain
   mysqlPvcSize: 100Gi
   #Admin Username
-  adminUsername: admin@example.com
-  #Admin Email
-  adminEmail: admin@example.com
+  adminUsername: admin
   #Seed Users
   seedUsers:
     count: 2

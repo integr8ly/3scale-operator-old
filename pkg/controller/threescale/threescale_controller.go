@@ -234,11 +234,11 @@ func (r *ReconcileThreeScale) ReconcileThreeScale(obj *threescalev1alpha1.ThreeS
 		return nil, errors.Wrap(err, "error reconciling auth providers")
 	}
 	log.Info("Reconcile Authentication Providers: done")
-	//ts, err = r.ReconcileUsers(ts, tsClient)
-	//if err != nil {
-	//	return nil, errors.Wrap(err, "error reconciling users")
-	//}
-	//log.Info("Reconcile Users: done")
+	ts, err = r.ReconcileUsers(ts, tsClient)
+	if err != nil {
+		return nil, errors.Wrap(err, "error reconciling users")
+	}
+	log.Info("Reconcile Users: done")
 
 	return ts, nil
 }
@@ -256,7 +256,7 @@ func (r *ReconcileThreeScale) InstallThreeScale(ts *threescalev1alpha1.ThreeScal
 	if err != nil {
 		return nil, errors.Wrap(err, "failed to get the secret for the master credentials")
 	}
-
+	//
 	for k, v := range adminCreds.Data {
 		decodedParams[k] = string(v)
 	}
@@ -275,11 +275,8 @@ func (r *ReconcileThreeScale) InstallThreeScale(ts *threescalev1alpha1.ThreeScal
 	if ts.Spec.AdminUsername != "" {
 		decodedParams["ADMIN_USERNAME"] = string(ts.Spec.AdminUsername)
 	}
-	if ts.Spec.AdminEmail != "" {
-		decodedParams["ADMIN_EMAIL"] = string(ts.Spec.AdminEmail)
-	}
 	decodedParams["WILDCARD_DOMAIN"] = string(ts.Spec.RouteSuffix)
-	//Set params
+	////Set params
 
 	objects, err := r.GetInstallResourcesAsRuntimeObjects(ts, decodedParams)
 	if err != nil {

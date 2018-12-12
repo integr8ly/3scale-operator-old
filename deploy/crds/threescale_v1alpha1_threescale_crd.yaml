@@ -18,8 +18,7 @@ spec:
           properties:
             adminUsername:
               type: string
-            adminEmail:
-              type: string
+              pattern: '^[a-z][a-z0-9]+$'
             adminCredentials:
               type: string
             routeSuffix:
