@@ -85,7 +85,7 @@ func verifyDeployment(t *testing.T, f *framework.Framework, ctx *framework.TestC
 	backendDcs := []string{"backend-cron", "backend-listener", "backend-redis", "backend-worker"}
 	zyncDcs := []string{"zync", "zync-database"}
 	apiCastDcs := []string{"apicast-wildcard-router", "apicast-staging", "apicast-production"}
-	routes := []string{"api-apicast-production-route", "api-apicast-staging-route", "apicast-wildcard-router-route", "backend-route", "system-developer-route", "system-master-admin-route", "system-provider-admin-route"}
+	routes := []string{"api-apicast-production-route", "api-apicast-staging-route", "apicast-wildcard-router-route", "backend-route", "system-developer-route", "system-master-admin-route", "system-provider-admin"}
 	secrets := []string{"admin-credentials", "3scale-master-access-token"}
 
 	err = verifyDeploymentConfigs(t, f, namespace, systemDcs)

@@ -3,16 +3,17 @@ package threescale
 import (
 	"context"
 	"fmt"
+	"reflect"
+	"strings"
+	"time"
+
 	"github.com/integr8ly/3scale-operator/pkg/threescale"
 	"github.com/pkg/errors"
 	log "github.com/sirupsen/logrus"
 	"k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/client-go/rest"
-	"reflect"
 	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
-	"strings"
-	"time"
 
 	"github.com/google/uuid"
 	openshift "github.com/integr8ly/3scale-operator/pkg/apis/openshift/client"
@@ -244,7 +245,7 @@ func (r *ReconcileThreeScale) ReconcileThreeScale(obj *threescalev1alpha1.ThreeS
 }
 
 func (r *ReconcileThreeScale) InstallThreeScale(ts *threescalev1alpha1.ThreeScale) (*threescalev1alpha1.ThreeScale, error) {
-	//Set params
+	// Set params
 	decodedParams := map[string]string{}
 	adminCreds := &v1.Secret{}
 	err := r.client.Get(context.TODO(), types.NamespacedName{Name: ts.Spec.AdminCredentials, Namespace: ts.Namespace}, adminCreds)
@@ -256,7 +257,6 @@ func (r *ReconcileThreeScale) InstallThreeScale(ts *threescalev1alpha1.ThreeScal
 	if err != nil {
 		return nil, errors.Wrap(err, "failed to get the secret for the master credentials")
 	}
-
 	for k, v := range adminCreds.Data {
 		decodedParams[k] = string(v)
 	}
@@ -279,7 +279,6 @@ func (r *ReconcileThreeScale) InstallThreeScale(ts *threescalev1alpha1.ThreeScal
 		decodedParams["ADMIN_EMAIL"] = string(ts.Spec.AdminEmail)
 	}
 	decodedParams["WILDCARD_DOMAIN"] = string(ts.Spec.RouteSuffix)
-	//Set params
 
 	objects, err := r.GetInstallResourcesAsRuntimeObjects(ts, decodedParams)
 	if err != nil {
@@ -328,7 +327,7 @@ func (r *ReconcileThreeScale) CheckInstallResourcesReady(ts *threescalev1alpha1.
 	}
 
 	adminRoute := &routev1.Route{}
-	err = r.client.Get(context.TODO(), types.NamespacedName{Name: "system-provider-admin-route", Namespace: ts.Namespace}, adminRoute)
+	err = r.client.Get(context.TODO(), types.NamespacedName{Name: "system-provider-admin", Namespace: ts.Namespace}, adminRoute)
 	if err != nil {
 		return nil, errors.Wrap(err, "failed to get admin route")
 	}

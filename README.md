@@ -41,7 +41,7 @@ operator-sdk up local --namespace=3scale --operator-flags="--resync=10 --log-lev
 INFO[0000] Go Version: go1.10.1                         
 INFO[0000] Go OS/Arch: linux/amd64                      
 INFO[0000] operator-sdk Version: 0.0.6                  
-INFO[0000] 3Scale Version: 2.2.0.GA                     
+INFO[0000] 3Scale Version: 2.4.0.GA                     
 INFO[0001] Watching 3scale.net/v1alpha1, ThreeScale, 3scale, 10000000000 
 DEBU[0001] starting threescales controller
 ```

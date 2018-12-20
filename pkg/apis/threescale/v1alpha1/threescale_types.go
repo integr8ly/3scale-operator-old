@@ -6,8 +6,8 @@ import (
 
 const (
 	ThreescaleKind    = "ThreeScale"
-	ThreescaleVersion = "2.2.0.GA"
-	TEMPLATE_NAME     = "3scale-amp-2.2.0.GA.yml"
+	ThreescaleVersion = "2.4.0.GA"
+	TEMPLATE_NAME     = "3scale-amp-2.4.0.yml"
 )
 
 type Config struct {
